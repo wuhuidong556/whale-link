@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>鲸鱼娘 · whale-link</title>
+<style>
+  :root { --ink:#16324d; --blue:#2f6ea6; --line:rgba(22,50,77,.12); }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { height:100%; margin:0; font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+    color:var(--ink); background:radial-gradient(120% 90% at 70% 10%,#eaf6ff,#cfe6f7 55%,#b6d4ea); overflow:hidden; }
+  canvas { position:fixed; inset:0; width:100vw !important; height:100vh !important; z-index:0; }
+  #bubble { position:fixed; left:50%; transform:translateX(-50%); top:54px; max-width:min(92vw,560px);
+    background:rgba(255,255,255,.95); border-radius:14px; padding:10px 14px; font-size:14px; line-height:1.5;
+    box-shadow:0 8px 24px rgba(16,48,80,.18); z-index:3; transition:opacity .3s; }
+  #bubble.hide { opacity:0; pointer-events:none; }
+
+  #tabs { position:fixed; top:8px; left:50%; transform:translateX(-50%); display:flex; gap:6px; z-index:6;
+    background:rgba(255,255,255,.72); padding:5px; border-radius:12px; backdrop-filter:blur(8px); }
+  #tabs button { border:0; background:transparent; color:#33536f; font-size:14px; padding:7px 14px; border-radius:9px; }
+  #tabs button.on { background:var(--blue); color:#fff; }
+
+  .pane { position:fixed; inset:0; z-index:2; display:none; flex-direction:column; padding:52px 16px 92px; }
+  #pane-pc, #pane-files, #pane-dsh { background:rgba(233,244,253,.96); }
+  #pane-pc h3, #pane-files h3 { margin:8px 0 10px; font-size:15px; color:#2b5f8a; }
+  .pane.on { display:flex; }
+
+  #chatbar { position:fixed; left:0; right:0; bottom:0; z-index:5; margin-top:0;
+             padding:10px 10px calc(10px + env(safe-area-inset-bottom)); display:flex; gap:8px; align-items:center;
+    background:linear-gradient(rgba(255,255,255,0),rgba(255,255,255,.86) 40%); }
+  #say { flex:1; border:1px solid var(--line); background:rgba(255,255,255,.94); border-radius:12px; padding:11px 12px; font-size:15px; outline:none; }
+  .btn { border:0; border-radius:12px; padding:11px 14px; font-size:15px; background:#fff; color:var(--blue); box-shadow:0 2px 8px rgba(16,48,80,.12); }
+  .btn.primary { background:var(--blue); color:#fff; }
+  .btn.rec { background:#e2564b; color:#fff; }
+
+  #pane-files, #pane-dsh { background:rgba(255,255,255,.92); overflow:auto; padding:56px 14px 18px; }
+  #files h3 { margin:8px 0 10px; font-size:15px; }
+  #flist { display:flex; flex-direction:column; gap:8px; }
+  .fitem { display:flex; justify-content:space-between; gap:10px; background:#fff; border:1px solid var(--line);
+    border-radius:11px; padding:10px 12px; font-size:14px; }
+  .fitem a { color:var(--blue); text-decoration:none; }
+  .fitem small { color:#6a819a; }
+  #dshopen { position:fixed; right:10px; top:12px; z-index:7; font-size:12px; color:#2b5f8a; text-decoration:none; background:#fff; padding:5px 9px; border-radius:8px; box-shadow:0 2px 8px #0001; }
+  #pane-dsh iframe { width:100%; height:100%; border:0; border-radius:12px; background:#fff; }
+  #hint { position:fixed; left:50%; transform:translateX(-50%); bottom:calc(76px + env(safe-area-inset-bottom));
+    font-size:12px; color:#4c6a86; z-index:3; }
+  /* 桌面宠物模式 */
+  html.pet, html.pet body { background: radial-gradient(120% 90% at 70% 10%, #eaf6ff 0%, #cfe6f7 55%, #b6d4ea 100%); }
+  html.pet #tabs, html.pet #chatbar, html.pet #hint, html.pet #modelink { display: none !important; }
+  html.pet #bubble { top: 8px; font-size: 13px; left: 8px; right: 8px; transform: none; max-width: none; }
+
+  @media (max-width: 560px) {
+    #tabs { top: 6px; gap: 4px; }
+    #tabs button { padding: 6px 12px; font-size: 13px; }
+    #bubble { top: 46px; max-width: 88vw; font-size: 13px; padding: 8px 12px; }
+    #chatbar { padding: 8px 8px calc(8px + env(safe-area-inset-bottom)); gap: 6px; }
+    #say { font-size: 15px; height: 40px; }
+    #hold, #send { font-size: 13px; padding: 9px 10px; }
+    #hint { display: none; }
+    #dshopen { position:fixed; right:10px; top:12px; z-index:7; font-size:12px; color:#2b5f8a; text-decoration:none; background:#fff; padding:5px 9px; border-radius:8px; box-shadow:0 2px 8px #0001; }
+  #pane-dsh iframe { height: 100vh; }
+    #pane-shell { padding: 44px 12px 8px; }
+    #pane-shell h2 { font-size: 18px; margin: 6px 0; }
+    .fs-row { font-size: 13px; }
+  }
+
+  .pcgrid { display:grid; grid-template-columns:1fr 1fr; gap:8px; max-width:520px; }
+  .pcgrid button { padding:12px; border-radius:12px; border:1px solid #cfe3f5; background:#fff; font-size:14px; }
+  .row { display:flex; gap:8px; align-items:center; margin-top:10px; flex-wrap:wrap; }
+  .row input { flex:1; min-width:160px; padding:9px 10px; border:1px solid #cfe3f5; border-radius:10px; font-size:14px; }
+  .row button { padding:9px 14px; border-radius:10px; border:1px solid #cfe3f5; background:#fff; font-size:14px; }
+  .row.danger button { border-color:#f3c2c2; color:#a33; }
+  .tip { font-size:12px; color:#6b8aa6; }
+  #pcimg { display:none; width:100%; margin-top:12px; border-radius:12px; box-shadow:0 6px 24px #0002; }
+  .mlist { max-height:36vh; overflow:auto; font-size:13px; line-height:1.65; background:#fff;
+           border-radius:12px; padding:10px 12px; box-shadow:0 2px 10px #0001; }
+  .mlist div { border-bottom:1px dashed #e6f0f8; padding:4px 0; }
+  .mlist b { color:#2b5f8a; font-weight:600; }
+</style>
+</head>
+<body>
+<div id="bubble" class="hide">主人，我在这里。</div>
+<div id="tabs">
+  <button data-p="chat" class="on">对话</button>
+  <button data-p="files">文件</button>
+  <button data-p="pc">电脑</button>
+  <button data-p="dsh">DSH</button>
+</div>
+
+<div class="pane on" id="pane-chat">
+  <div id="chatbar">
+    <button class="btn" id="hold">按住说话</button>
+    <input id="say" placeholder="也可以打字…">
+    <button class="btn primary" id="send">发送</button>
+  </div>
+  <div id="hint">空格键也能按住说话（电脑端）</div>
+  <a id="modelink" href="?lite=0" style="position:fixed;right:8px;bottom:calc(74px + env(safe-area-inset-bottom));z-index:6;font-size:11px;color:#5b7f9e;text-decoration:none;background:rgba(255,255,255,.8);padding:3px 7px;border-radius:8px">纯文字模式</a>
+</div>
+
+<div class="pane" id="pane-files">
+  <h3>电脑上的文件（点名字下载）</h3>
+  <div id="fnew" style="font-size:12px;color:#2b6fa8;margin-bottom:8px;line-height:1.9"></div>
+  <div id="flist"></div>
+  <h3 style="margin-top:14px">记忆（手机和电脑共用一份）</h3>
+  <div id="mlist" class="mlist"></div>
+  <div class="row">
+    <button id="mexp">导出</button>
+    <button id="mimp">导入</button>
+    <button id="mpull">从 DSH 拉取</button>
+    <input id="mfile" type="file" accept="application/json" style="display:none">
+  </div>
+  <h3 style="margin-top:18px">传到电脑</h3>
+  <input type="file" id="up" multiple>
+</div>
+
+<div class="pane" id="pane-pc">
+  <h3>电脑</h3>
+  <div class="pcgrid">
+    <button data-pc="shot">截屏</button>
+    <button data-pc="lock">锁屏</button>
+    <button data-pc="volume" data-arg="1">音量 +</button>
+    <button data-pc="volume" data-arg="-1">音量 −</button>
+    <button data-pc="media" data-arg="play">播放 / 暂停</button>
+    <button data-pc="media" data-arg="next">下一首</button>
+    <button data-pc="screen">唤醒屏幕</button>
+    <button data-pc="wake" title="浏览器不能自己发包：需要同网段常开设备（路由器/NAS）代发，或先在本机点一次">远程开机</button>
+    <button data-pc="run" data-arg="notepad">记事本</button>
+  </div>
+  <div class="row">
+    <input id="pcurl" placeholder="让电脑打开一个网址">
+    <button id="pcgo">打开</button>
+  </div>
+  <div class="row danger">
+    <button id="pcshut">关机</button>
+    <button id="pcrestart">重启</button>
+    <span class="tip">30 秒后执行，可取消</span>
+    <button id="pcabort">取消</button>
+  </div>
+  <div id="pcmsg" class="tip"></div>
+  <img id="pcimg" alt="电脑屏幕">
+
+  <h3 style="margin-top:16px">桌面形象</h3>
+  <div id="petbox" style="font-size:13px;line-height:2;color:#2b5f8a">
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button id="peton">把鲸鱼娘放上桌面</button>
+      <button id="petoff" class="ghost">从桌面收起来</button>
+      <button id="petperm" class="ghost">给悬浮权限</button>
+      <button id="wpaper" class="ghost">设成动态壁纸</button>
+      <button id="bootsnd" class="ghost">开机问候：开</button>
+      <button id="boottest" class="ghost">试听</button>
+    </div>
+    <div style="opacity:.75;margin-top:6px">开机后会自己回来；桌面上可拖动、轻点回 App、长按隐藏。</div>
+  </div>
+  <h3 style="margin-top:16px">手机通知</h3>
+  <div id="nbox" style="font-size:12px;color:#5b7f9e;margin-bottom:6px"></div>
+  <div id="nlist" class="mlist" style="max-height:72vh"></div>
+  <div class="row" id="nrow" style="display:none">
+    <button id="nperm">开启通知读取</button>
+    <button id="ntest" class="ghost">发测试通知</button>
+    <button id="ntoggle" class="ghost">暂停推送</button>
+  </div>
+</div>
+
+<div class="pane" id="pane-dsh">
+  <a id="dshopen" href="/dsh/" target="_blank">新窗口打开</a>
+  <iframe src="/dsh/" allow="clipboard-read; clipboard-write"></iframe>
+</div>
+
+<script src="/static/vendor/pixi.min.js"></script>
+<script src="/static/vendor/live2dcubismcore.min.js"></script>
+<script src="/static/vendor/cubism4.min.js"></script>
+<script>
+const $ = (s) => document.querySelector(s);
+async function checkDsh() {
+  try {
+    const r = await fetch('/api/dshcheck');
+    const j = await r.json();
+    if (j.upstream === 401) show('DSH 说 token 不对：打开 server/config.json，把 dsh_token 换成启动 DSH 时打印的那个值，再重启 whale-link。', 9000);
+    else if (j.upstream === 0) show('连不上 DSH：先确认 DSH 正在运行。', 6000);
+  } catch (e) {}
+}
+const PET_MODE = new URLSearchParams(location.search).has("pet");
+if (PET_MODE) document.documentElement.classList.add("pet");
+let app, model, audioCtx, analyser, dataArr, cur = null, muted = false;
+const queue = [];
+
+/* ---------- 标签页 ---------- */
+$("#tabs").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  document.querySelectorAll("#tabs button").forEach((x) => x.classList.toggle("on", x === b));
+  document.querySelectorAll(".pane").forEach((p) => p.classList.remove("on"));
+  $("#pane-" + b.dataset.p).classList.add("on");
+  if (b.dataset.p === "files") loadFiles();
+});
+
+/* ---------- 气泡 ---------- */
+function show(text, sticky) {
+  const b = $("#bubble");
+  b.textContent = text; b.classList.remove("hide");
+  clearTimeout(show._t);
+  if (!sticky) show._t = setTimeout(() => b.classList.add("hide"), Math.max(4200, text.length * 240));
+}
+
+
+/* ---------- 记忆 ---------- */
+async function loadMem() {
+  const box = $("#mlist"); if (!box) return;
+  try {
+    const d = await (await fetch("/api/memory?n=20")).json();
+    box.innerHTML = d.items.map((it) =>
+      `<div><b>${it.role === "user" ? "主人" : "我"}</b>：${it.text.replace(/[<>&]/g, (c) => ({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]))}</div>`
+    ).join("") || '<div class="tip">还没有记录，聊两句就有了。</div>';
+  } catch (e) { box.textContent = "读取失败"; }
+}
+$("#mexp").onclick = () => { location.href = "/api/memory/export"; };
+$("#mimp").onclick = () => $("#mfile").click();
+$("#mfile").onchange = async (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const j = JSON.parse(await f.text());
+    const r = await (await fetch("/api/memory/import", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(j)})).json();
+    show(`导入 ${r.added} 条`);
+    loadMem();
+  } catch (err) { show("导入失败：" + err.message); }
+};
+$("#mpull").onclick = async () => {
+  const r = await (await fetch("/api/memory/pull", {method:"POST"})).json();
+  show(`从 DSH 拉来 ${r.added} 条`); loadMem();
+};
+
+/* ---------- 控制电脑 ---------- */
+async function pcAct(act, arg, extra) {
+  const body = Object.assign({act: act, arg: arg}, extra || {});
+  const r = await (await fetch("/api/pc/action", {method:"POST",
+    headers:{"Content-Type":"application/json"}, body: JSON.stringify(body)})).json();
+  if (r.msg) $("#pcmsg").textContent = r.msg;
+  return r;
+}
+document.querySelectorAll("[data-pc]").forEach((b) => b.onclick = async () => {
+  const act = b.dataset.pc;
+  if (act === "shot") { shot(); return; }
+  await pcAct(act, b.dataset.arg || b.textContent.trim());
+  if (act === "lock") show("锁了，回来记得输密码");
+});
+async function shot() {
+  const img = $("#pcimg");
+  img.style.display = "block";
+  img.src = "/api/pc/shot?t=" + Date.now();
+}
+$("#pcgo").onclick = async () => {
+  const u = $("#pcurl").value.trim(); if (!u) return;
+  const r = await pcAct("url", u);
+  show(r.ok ? "让电脑打开了" : "网址不对");
+};
+$("#pcshut").onclick = async () => {
+  if (!confirm("30 秒后关机，确定？")) return;
+  const r = await pcAct("power", "shutdown", {confirm: "确认"});
+  show(r.ok ? "已排队，30 秒后关机（可点取消）" : "没执行");
+};
+$("#pcrestart").onclick = async () => {
+  if (!confirm("30 秒后重启，确定？")) return;
+  await pcAct("power", "restart", {confirm: "确认"});
+  show("已排队，30 秒后重启");
+};
+$("#pcabort").onclick = async () => { await pcAct("power", "abort"); show("取消了"); };
+
+/* 切到这两个页时刷新 */
+const _oldTab = $("#tabs").onclick;
+$("#tabs").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.p === "files") { loadMem(); }
+  if (b.dataset.p === "pc") { $("#pcmsg").textContent = ""; }
+});
+
+/* ---------- Live2D ---------- */
+async function loadModel() {
+  app = new PIXI.Application({ backgroundAlpha: 0, resizeTo: window, antialias: true });
+  document.body.appendChild(app.view);
+  model = await PIXI.live2d.Live2DModel.from("/static/models/ds_whale/c_0120.model3.json");
+  app.stage.addChild(model);
+  window.__model = model;
+
+  const origUpdate = model.update.bind(model);
+  model.update = (dt) => {
+    let v = 0;
+    if (analyser && cur && !cur.paused && !cur.muted) {
+      analyser.getByteTimeDomainData(dataArr);
+      let sum = 0;
+      for (let i = 0; i < dataArr.length; i++) sum += Math.abs(dataArr[i] - 128);
+      v = Math.min(1, sum / dataArr.length / 18);
+    }
+    try { model.internalModel.coreModel.setParameterValueById("ParamMouthOpenY", v * 0.9); } catch (e) {}
+    origUpdate(dt);
+  };
+
+  const fit = () => {
+    const b = model.getLocalBounds();
+    const s = Math.min((window.innerHeight * 0.92) / b.height, (window.innerWidth * 0.92) / b.width);
+    model.scale.set(s);
+    model.x = window.innerWidth / 2 - (b.x + b.width / 2) * s;
+    model.y = window.innerHeight - (b.y + b.height) * s - 6;
+  };
+  fit(); setTimeout(fit, 150); setInterval(fit, 2000);
+  window.addEventListener("resize", fit);
+
+  model.interactive = true;
+  model.on("pointermove", (e) => model.focus(e.data.global.x, e.data.global.y));
+  model.on("pointertap", () => model.motion("TapBody"));
+  model.motion("Idle");
+}
+
+/* ---------- 声音 ---------- */
+function ensureAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 1024;
+    analyser.connect(audioCtx.destination);
+    dataArr = new Uint8Array(analyser.fftSize);
+  }
+  audioCtx.resume();
+}
+
+async function speak(text) {
+  if (!text) return;
+  ensureAudio();
+  queue.push(text);
+  if (queue.length > 1) return;
+  await nextAudio();
+}
+
+const pre = new Map();
+function prefetch(text) {
+  if (!text || pre.has(text)) return;
+  fetch("/api/tts?text=" + encodeURIComponent(text))
+    .then((r) => r.blob())
+    .then((b) => pre.set(text, URL.createObjectURL(b)))
+    .catch(() => {});
+}
+
+async function nextAudio() {
+  const text = queue[0];
+  if (!text) return;
+  show(text, true);
+  try {
+    let url = pre.get(text);
+    if (!url) {
+      const r = await fetch("/api/tts?text=" + encodeURIComponent(text));
+      url = URL.createObjectURL(await r.blob());
+    }
+    prefetch(queue[1]);
+    const audio = new Audio(url);
+    window.__lastAudio = audio;
+    audio.muted = muted;
+    const src = audioCtx.createMediaElementSource(audio);
+    src.connect(analyser);
+    cur = audio;
+    await audio.play();
+    audio.onended = () => { cur = null; queue.shift(); prefetch(queue[0]); nextAudio(); };
+  } catch (e) {
+    show("声音没出来：" + e.message);
+    queue.shift();
+  }
+}
+
+async function reply(text) {
+  show("……", true);
+  try {
+    const r = await fetch("/api/chat_stream", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text })
+    });
+    if (!r.ok || !r.body) throw new Error("stream " + r.status);
+    const reader = r.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "", pend = "";
+    const flush = () => {
+      const re = new RegExp("^[^。！？!?" + "\n" + "]*[。！？!?" + "\n" + "]");
+      let m;
+      while ((m = pend.match(re))) {
+        const seg = m[0].trim();
+        pend = pend.slice(m[0].length);
+        if (seg) speak(seg);
+      }
+    };
+    const SEP = String.fromCharCode(10) + String.fromCharCode(10);
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let i;
+      while ((i = buf.indexOf(SEP)) >= 0) {
+        const chunk = buf.slice(0, i);
+        buf = buf.slice(i + SEP.length);
+        for (const line of chunk.split(String.fromCharCode(10))) {
+          if (!line.startsWith("data:")) continue;
+          let obj;
+          try { obj = JSON.parse(line.slice(5)); } catch (e) { continue; }
+          if (obj.err) show("出错：" + obj.err);
+          if (obj.d) { pend += obj.d; flush(); }
+        }
+      }
+    }
+    if (pend.trim()) speak(pend.trim());
+  } catch (e) {
+    show("连不上后台：" + e.message);
+  }
+}
+
+/* ---------- 输入 ---------- */
+function fitKeyboard() {
+  const bar = document.querySelector("#chatbar");
+  if (!bar) return;
+  const vv = window.visualViewport;
+  if (!vv) return;
+  const gap = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+  bar.style.bottom = gap + "px";
+}
+if (window.visualViewport) {
+  visualViewport.addEventListener("resize", fitKeyboard);
+  visualViewport.addEventListener("scroll", fitKeyboard);
+}
+$("#send").onclick = () => { const v = $("#say").value.trim(); if (v) { $("#say").value = ""; reply(v); } };
+$("#say").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#send").click(); });
+
+/* ---------- 录音（按住说话 / 空格） ---------- */
+let media = null, chunks = [], rec = false, stream = null;
+
+async function startRec() {
+  if (rec) return;
+  ensureAudio();
+  try {
+    if (!stream) stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (e) { show("拿不到麦克风：" + e.message); return; }
+  chunks = [];
+  media = new MediaRecorder(stream, { mimeType: "audio/webm;codecs=opus" });
+  media.ondataavailable = (ev) => { if (ev.data.size) chunks.push(ev.data); };
+  media.onstop = async () => {
+    rec = false;
+    const blob = new Blob(chunks, { type: "audio/webm" });
+    if (blob.size < 1200) { show("说得太短，再来一次。"); return; }
+    show("……让我听听", true);
+    try {
+      const r = await fetch("/api/stt", { method: "POST", body: blob });
+      const j = await r.json();
+      const txt = (j.text || "").trim();
+      if (txt) reply(txt); else show("没听清，再说一遍？");
+    } catch (e) { show("识别失败：" + e.message); }
+  };
+  media.start();
+  rec = true;
+  show("在听……松手就发出去", true);
+}
+
+function stopRec() { if (media && rec) media.stop(); }
+
+const hold = $("#hold");
+hold.addEventListener("pointerdown", (e) => { e.preventDefault(); hold.classList.add("rec"); startRec(); });
+["pointerup", "pointercancel", "pointerleave"].forEach((t) =>
+  hold.addEventListener(t, () => { hold.classList.remove("rec"); stopRec(); }));
+
+const COARSE = window.matchMedia("(pointer: coarse)").matches;
+document.addEventListener("keydown", (e) => {
+  if (COARSE) return;
+  if (e.code === "Space" && document.activeElement !== $("#say")) { e.preventDefault(); if (!e.repeat) startRec(); }
+});
+document.addEventListener("keyup", (e) => {
+  if (COARSE) return;
+  if (e.code === "Space" && document.activeElement !== $("#say")) { e.preventDefault(); stopRec(); }
+});
+
+/* ---------- 文件 ---------- */
+const SYNC_KEY = "wl_seen_files";
+const seenFiles = () => { try { return JSON.parse(localStorage.getItem(SYNC_KEY) || "{}"); } catch { return {}; } };
+const saveSeen = (m) => localStorage.setItem(SYNC_KEY, JSON.stringify(m));
+
+async function filesState() {
+  const r = await fetch("/api/files/state");
+  return (await r.json()).files || {};
+}
+
+// 电脑侧新增（按 size+mtime 判变化），只提示，不偷偷下一堆文件
+async function checkNew() {
+  const st = await filesState();
+  const seen = seenFiles();
+  const fresh = Object.keys(st).filter((n) => {
+    const [s, m] = st[n];
+    return !seen[n] || seen[n][0] !== s || seen[n][1] !== m;
+  });
+  const bar = $("#fnew");
+  if (!bar) return;
+  bar.innerHTML = fresh.length
+    ? `电脑上有 ${fresh.length} 个新文件：` + fresh.map((n) => `<a href="/api/files/${encodeURIComponent(n)}" data-new="${n}">${n}</a>`).join("、") +
+      ` <button id="fmark" class="ghost" style="padding:2px 8px">标记已同步</button>`
+    : "";
+  const mk = $("#fmark");
+  if (mk) mk.onclick = () => { fresh.forEach((n) => { seen[n] = st[n]; }); saveSeen(seen); checkNew(); };
+}
+
+async function loadFiles() {
+  const r = await fetch("/api/files");
+  const j = await r.json();
+  $("#flist").innerHTML = (j.files || []).map((f) =>
+    `<div class="fitem"><a href="/api/files/${encodeURIComponent(f.name)}">${f.name}</a>
+     <small>${(f.size / 1024).toFixed(0)} KB</small></div>`).join("") || "<small>还没有文件</small>";
+  checkNew();
+}
+setInterval(() => { if ($("#pane-files").classList.contains("on")) checkNew(); }, 6000);
+
+$("#up").addEventListener("change", async (e) => {
+  for (const f of e.target.files) {
+    const fd = new FormData();
+    fd.append("file", f, f.name);
+    await fetch("/api/files", { method: "POST", body: fd });
+  }
+  loadFiles();
+  show("传好了。");
+});
+
+/* ---------- 手机通知 ---------- */
+const NL = () => document.querySelector("#nlist");
+async function loadNotify() {
+  const r = await fetch("/api/phone/notify?n=20");
+  const j = await r.json();
+  const items = j.items || [];
+  if (NL()) {
+    NL().innerHTML = items.map((n) =>
+      `<div style="font-size:12px;line-height:1.6;padding:4px 0;border-bottom:1px solid rgba(0,0,0,.05)">
+        <b>${n.app || "?"}</b> · ${new Date((n.ts || 0) * 1000).toLocaleTimeString("zh-CN", {hour: "2-digit", minute: "2-digit"})}<br>
+        ${n.title ? "<b>" + n.title + "</b> " : ""}${n.text || ""}
+      </div>`).join("") || "<small>还没有通知</small>";
+  }
+  if ($("#nbox") && !window.Native) {
+    $("#nbox").textContent = items.length
+      ? `最近 ${items.length} 条 · 授权在手机 App 的「电脑」页里做`
+      : "授权在手机 App 的「电脑」页里做：点「开启通知读取」，勾选「鲸鱼娘」";
+  } else if ($("#nbox") && items.length) {
+    $("#nbox").textContent = `最近 ${items.length} 条`;
+  }
+}
+
+function initNotifyBox() {
+  loadNotify();
+  setInterval(() => { if ($("#pane-pc").classList.contains("on")) loadNotify(); }, 8000);
+  if (!window.Native || !Native.openNotifySettings) return;
+  $("#nrow").style.display = "flex";
+  const on = Native.notifyEnabled();
+  $("#nbox").textContent = on ? "通知读取已授权" : "还没授权：点下面按钮，在系统列表里勾选「鲸鱼娘」";
+  $("#nperm").onclick = () => Native.openNotifySettings();
+  const nt = $("#ntest");
+  if (nt) nt.onclick = () => { Native.toast(Native.testNotify()); setTimeout(loadNotify, 1200); };
+  $("#ntoggle").onclick = () => {
+    const paused = $("#ntoggle").textContent.includes("恢复");
+    Native.setPushNotify(paused);
+    $("#ntoggle").textContent = paused ? "暂停推送" : "恢复推送";
+  };
+}
+
+/* ---------- 手机端后台同步 ---------- */
+async function initSyncBox() {
+  if (!window.Native) return;
+  const qt = new URLSearchParams(location.search).get("t");
+  if (qt && Native.setToken) Native.setToken(qt);
+  if (!Native.pickFolder) return;
+  $("#syncbox").style.display = "block";
+  try {
+    const r = await fetch("/api/session");
+    if (r.status === 401 || r.status === 403) { location.href = "/pair"; return; }
+    const j = await r.json();
+    if (j.token) Native.setToken(j.token);
+  } catch {}
+  const refresh = () => { try { $("#syncst").textContent = Native.syncStatus(); } catch (e) {} };
+  refresh();
+  $("#pickdir").onclick = () => { Native.pickFolder(); setTimeout(refresh, 1500); };
+  $("#startsync").onclick = () => { Native.startSync(); setTimeout(refresh, 1200); };
+  $("#stopsync").onclick = () => { Native.stopSync(); setTimeout(refresh, 800); };
+  setInterval(refresh, 5000);
+}
+
+/* ---------- 桌面悬浮形象 ---------- */
+function initPetBox() {
+  const box = $("#petbox");
+  box.style.display = "block";
+  if (!window.Native || !Native.startPet) {
+    box.innerHTML = '<div style="color:#8a5a00;background:#fff6e0;padding:8px 10px;border-radius:8px">'
+      + '当前 App 版本还没有桌面形象功能，装一次 1.4.0 就会出现按钮。</div>';
+    return;
+  }
+  $("#petperm").onclick = () => Native.openOverlaySettings();
+  $("#wpaper").onclick = () => Native.toast(Native.openWallpaper());
+  const bs = $("#bootsnd");
+  const paintBs = () => { bs.textContent = "开机问候：" + (Native.bootSoundOn() ? "开" : "关"); };
+  paintBs();
+  bs.onclick = () => { const on = !Native.bootSoundOn(); Native.setBootSound(on); paintBs(); Native.toast(on ? "开机时会说：主人，欢迎回来" : "已关掉开机问候"); };
+  $("#boottest").onclick = () => Native.testBootSound();
+  $("#peton").onclick = () => Native.toast(Native.startPet());
+  $("#petoff").onclick = () => { Native.stopPet(); Native.toast("已从桌面收起"); };
+}
+
+/* ---------- 启动 ---------- */
+const QS = new URLSearchParams(location.search);
+const NOLM = QS.has("nolm");
+if (QS.get("lite") === "1") localStorage.setItem("wl_lite", "1");
+if (QS.get("lite") === "0") localStorage.removeItem("wl_lite");
+const LITE = QS.get("lite") === "1" || (QS.get("lite") !== "0" && localStorage.getItem("wl_lite") === "1");
+initSyncBox();
+initNotifyBox();
+initPetBox();
+if (NOLM) {
+  // 排查模式：不打模型，只留聊天/文件/电脑/DSH，用来确认是不是 WebGL 画布抢焦点
+  console.warn("nolm: Live2D disabled");
+} else if (LITE) {
+  // 纯文字模式：不建 WebGL 画布、不跑 Live2D，专供「一开模型手机就卡死」的机型
+  document.addEventListener("keydown", (e) => { if (e.code === "Space") e.stopPropagation(); }, true);
+  console.warn("lite: Live2D disabled");
+} else {
+  loadModel().catch((e) => show("模型没加载出来：" + e.message, true));
+}
+setTimeout(() => show("主人，我在这里。", true), 600);
+</script>
+</body>
+</html>

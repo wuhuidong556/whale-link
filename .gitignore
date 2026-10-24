@@ -1,0 +1,25 @@
+# 运行期数据与密钥
+data/
+server/config.json
+*.log
+whisper_models/
+# 构建产物
+build/
+dist/
+android/.gradle/
+android/app/build/
+android/local.properties
+android/keystore.properties
+android/whale-release.jks
+# 杂项
+__pycache__/
+*.pyc
+.pytest_cache/
+~$*
+# 临时调试产物
+dsh8780.*
+tmp_conn.js
+_check.js
+pet_run.txt
+server/_patch_*.py
+web/_patch_*.py

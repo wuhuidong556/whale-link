@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>输入自检</title>
+<style>
+  html,body{margin:0;height:100%;font-family:system-ui,"Microsoft YaHei";background:#eef7ff}
+  .wrap{padding:16px;padding-bottom:120px}
+  h1{font-size:16px;margin:0 0 10px}
+  label{display:block;margin:14px 0 6px;font-size:13px;color:#33618d}
+  input{width:100%;box-sizing:border-box;padding:12px;font-size:16px;border:1px solid #b8d7ef;border-radius:10px;background:#fff}
+  #log{white-space:pre-wrap;font:12px/1.5 ui-monospace,Consolas,monospace;background:#0d2233;color:#9fe0ff;border-radius:10px;padding:10px;margin-top:14px;height:150px;overflow:auto}
+  #cv{position:fixed;inset:0;z-index:0;pointer-events:auto;background:rgba(255,0,0,.06)}
+  .bar{position:fixed;left:0;right:0;bottom:0;z-index:3;padding:10px;background:#fff;border-top:1px solid #cfe3f5;display:flex;gap:8px}
+  .bar input{flex:1}
+  button{padding:10px 14px;font-size:15px;border-radius:10px;border:1px solid #b8d7ef;background:#eaf4ff}
+  .tip{font-size:12px;color:#5b7f9e;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>输入自检</h1>
+  <p class="tip">依次在下面四个框里打字，看哪个能出字。页面底部会实时打印事件。</p>
+
+  <label>① 普通输入框</label>
+  <input id="a" placeholder="在这里打字">
+
+  <label>② 底部固定条里的输入框（和鲸鱼娘页面同结构）</label>
+  <div class="bar"><input id="b" placeholder="底部固定条…"><button>发送</button></div>
+
+  <label>③ 上面盖一层透明 canvas（模拟 Live2D 抢焦点）</label>
+  <input id="c" placeholder="canvas 开启时在这里打字">
+  <button onclick="document.getElementById('cv').style.display = (document.getElementById('cv').style.display==='none'?'block':'none')">开/关 canvas</button>
+
+  <div id="log"></div>
+</div>
+<canvas id="cv"></canvas>
+
+<script>
+const log = document.getElementById('log');
+const out = (s) => { log.textContent += s + "\n"; log.scrollTop = log.scrollHeight; };
+["a","b","c"].forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener("focus", () => out("focus #" + id));
+  el.addEventListener("blur",  () => out("blur  #" + id + " -> " + (document.activeElement.id || document.activeElement.tagName)));
+  el.addEventListener("keydown", (e) => out("key   #" + id + " " + e.key + " defaultPrevented=" + e.defaultPrevented));
+  el.addEventListener("input", () => out("input #" + id + " = " + el.value));
+  el.addEventListener("touchstart", () => out("touch #" + id), {passive:true});
+});
+document.addEventListener("keydown", (e) => out("doc keydown " + e.key + " coarse=" + matchMedia("(pointer: coarse)").matches));
+out("ready; coarse=" + matchMedia("(pointer: coarse)").matches + "; ua=" + navigator.userAgent);
+</script>
+</body>
+</html>

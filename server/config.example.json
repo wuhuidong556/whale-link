@@ -1,0 +1,14 @@
+{
+  "port": 8770,
+  "voice": "zh-CN-XiaoyiNeural",
+  "rate": "+6%",
+  "pitch": "+12Hz",
+  "dsh": "http://127.0.0.1:8780",
+  "nacho_config": "D:\\NachoBot-0.13.0\\NachoBot\\config\\model_config.toml",
+  "llm": {
+    "base_url": "https://api.deepseek.com/v1",
+    "api_key": "",
+    "model": "deepseek-flash"
+  },
+  "dsh_token": ""
+}

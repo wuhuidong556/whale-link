@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>连接电脑</title>
+<style>
+  html,body{height:100%;margin:0;background:radial-gradient(120% 90% at 70% 10%,#eaf6ff,#cfe6f7 55%,#b6d4ea);
+    font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:#16324d;display:flex;align-items:center;justify-content:center;padding:22px}
+  .card{width:100%;max-width:420px;background:rgba(255,255,255,.95);border-radius:18px;padding:24px 20px;
+    box-shadow:0 18px 44px rgba(16,48,80,.18)}
+  h1{font-size:19px;margin:0 0 8px}
+  p{font-size:13px;line-height:1.7;color:#4c6a86;margin:6px 0}
+  code{background:#eef6fd;border-radius:6px;padding:2px 6px;font-size:13px}
+  input{width:100%;margin-top:14px;padding:14px;font-size:16px;border:1px solid rgba(22,50,77,.16);border-radius:12px;outline:none}
+  button{width:100%;margin-top:12px;padding:14px;border:0;border-radius:12px;background:#2f6ea6;color:#fff;font-size:16px}
+  .tip{margin-top:14px;font-size:12px;color:#6a819a}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>连到电脑上的鲸鱼娘</h1>
+  <p>在电脑上运行 <code>whale-link\start.bat</code>，窗口里会显示局域网地址。</p>
+  <p>把那个地址填进来，例如 <code>http://192.168.0.101:8770</code></p>
+  <input id="u" placeholder="http://192.168.x.x:8770" autocomplete="off">
+  <button id="go">连接</button>
+  <p class="tip">手机要和电脑连同一个 Wi-Fi。第一次连上后，网页里还要输 6 位配对码（电脑窗口里有）。</p>
+  <p class="tip">换电脑：长按这个页面右上角 5 次清空地址。</p>
+</div>
+<script>
+const u = document.getElementById('u');
+u.value = window.Native ? window.Native.getUrl() : '';
+document.getElementById('go').onclick = () => {
+  const v = u.value.trim();
+  if (!v) return;
+  if (window.Native) { window.Native.saveUrl(v); }
+  else { location.href = v; }
+};
+let taps = 0;
+document.body.addEventListener('click', (e) => {
+  if (e.clientX > innerWidth - 60 && e.clientY < 60) {
+    if (++taps >= 5 && window.Native) { window.Native.reset(); }
+  }
+});
+</script>
+</body>
+</html>

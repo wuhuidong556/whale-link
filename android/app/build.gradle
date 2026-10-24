@@ -1,0 +1,46 @@
+plugins { id 'com.android.application' }
+
+def keystoreProps = new Properties()
+def keystoreFile = rootProject.file("keystore.properties")
+if (keystoreFile.exists()) {
+    keystoreFile.withInputStream { keystoreProps.load(it) }
+}
+
+android {
+    namespace 'dev.whalelink.app'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "dev.whalelink.app"
+        minSdk 24
+        targetSdk 34
+        versionCode 10
+        versionName "1.5.0"
+    }
+
+    signingConfigs {
+        release {
+            if (keystoreFile.exists()) {
+                storeFile rootProject.file(keystoreProps['storeFile'])
+                storePassword keystoreProps['storePassword']
+                keyAlias keystoreProps['keyAlias']
+                keyPassword keystoreProps['keyPassword']
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig keystoreFile.exists() ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+}

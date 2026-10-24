@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>airi-lite · 鲸鱼娘（Live2D）</title>
+<style>
+  html, body { margin:0; height:100%; overflow:hidden; font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif; }
+  body { background: radial-gradient(1200px 700px at 50% 18%, #dff1ff 0%, #b9d8f2 42%, #7fa8c9 100%); }
+  canvas { display:block; position:fixed; inset:0; width:100vw !important; height:100vh !important; z-index:0; }
+  #bubble, #panel, #hint, #err { z-index:2; }
+  #bubble {
+    position:fixed; left:50%; top:14px; transform:translateX(-50%);
+    max-width:min(760px,72vw); padding:14px 20px; border-radius:18px;
+    background:rgba(255,255,255,.92); color:#1f4260; font-size:17px; line-height:1.5;
+    box-shadow:0 8px 26px rgba(31,66,96,.16); min-height:24px; white-space:pre-wrap;
+  }
+  #panel { position:fixed; left:16px; bottom:16px; display:flex; gap:8px; align-items:center;
+           background:rgba(255,255,255,.85); padding:8px; border-radius:14px; box-shadow:0 6px 18px rgba(31,66,96,.12); }
+  button { border:0; border-radius:10px; padding:8px 14px; font-size:14px; cursor:pointer; background:#2f6ea6; color:#fff; }
+  button.ghost { background:#eaf4fd; color:#2f6ea6; }
+  #hint { position:fixed; right:16px; bottom:16px; font-size:12px; color:#4e7191; opacity:.8; }
+  #err { position:fixed; inset:auto 0 40% 0; text-align:center; color:#8a2b2b; font-size:14px; }
+</style>
+</head>
+<body>
+<div id="bubble">主人，点「试一句」听我说话。</div>
+<div id="panel">
+  <button id="mic">按住说话（点一下开始）</button>
+  <button id="test" class="ghost">试一句</button>
+  <button id="mute" class="ghost">静音</button>
+  <input id="say" placeholder="也可以直接打字…" style="width:200px;padding:7px 10px;border:1px solid #cfe3f5;border-radius:9px;font-size:14px;outline:none">
+  <button id="send" class="ghost">发送</button>
+</div>
+<div id="hint">自动播报 bot 的新消息 · 语音识别用浏览器自带</div>
+<div id="err"></div>
+
+<script src="/vendor/live2dcubismcore.min.js"></script>
+<script src="/vendor/pixi.min.js"></script>
+<script src="/vendor/cubism4.min.js"></script>
+<script>
+const $ = (s) => document.querySelector(s);
+const bubble = $("#bubble");
+let model = null, app = null, analyser = null, dataArr = null, audioCtx = null;
+let muted = false, timer = null, cur = null;
+const queue = [];
+
+function show(text) { bubble.textContent = text; }
+
+/* ---------------- Live2D ---------------- */
+async function loadModel() {
+  app = new PIXI.Application({ backgroundAlpha: 0, resizeTo: window, antialias: true });
+  document.body.appendChild(app.view);
+
+  model = await PIXI.live2d.Live2DModel.from("/models/ds_whale/c_0120.model3.json", {
+    autoInteract: false,
+    idleMotionGroup: "Idle"
+  });
+  app.stage.addChild(model);
+  window.__model = model;
+  const origUpdate = model.update.bind(model);
+  model.update = (dt) => {
+    let v = 0;
+    if (analyser && cur && !cur.paused && !cur.muted) {
+      analyser.getByteTimeDomainData(dataArr);
+      let sum = 0;
+      for (let i = 0; i < dataArr.length; i++) sum += Math.abs(dataArr[i] - 128);
+      v = Math.min(1, sum / dataArr.length / 18);
+    }
+    try {
+      const core = model.internalModel.coreModel;
+      core.setParameterValueById("ParamMouthOpenY", v * 0.9);
+    } catch (e) {}
+    origUpdate(dt);
+  };
+
+  const fit = () => {
+    const w = model.width, h = model.height;
+    const s = Math.min((window.innerHeight * 0.98) / h, (window.innerWidth * 0.6) / w);
+    model.scale.set(s);
+    model.x = window.innerWidth / 2 - (w * s) / 2;
+    model.y = window.innerHeight - h * s - 8;
+  };
+  fit();
+  window.addEventListener("resize", fit);
+
+  model.interactive = true;
+  model.on("pointermove", (e) => {
+    const p = e.data.global;
+    model.focus(p.x, p.y);
+  });
+  model.on("pointertap", () => {
+    model.motion("TapBody");
+    const ex = model.internalModel.settings.expressions || [];
+    if (ex.length) model.expression(Math.floor(Math.random() * ex.length));
+  });
+  model.motion("Idle");
+}
+
+/* ---------------- 音频 / 口型 ---------------- */
+function ensureAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 1024;
+    analyser.connect(audioCtx.destination);
+    dataArr = new Uint8Array(analyser.fftSize);
+  }
+  audioCtx.resume();
+}
+
+function mouthLoop() { /* 口型现在由 model.update 包装写入 */ }
+
+function askTTS(text) {
+  return fetch("/api/tts?text=" + encodeURIComponent(text)).then((r) => {
+    if (!r.ok) throw new Error("tts " + r.status);
+    return r.blob();
+  });
+}
+
+async function speak(text) {
+  if (!text) return;
+  ensureAudio();
+  queue.push(text);
+  if (queue.length > 1) return;
+  await next();
+}
+
+async function next() {
+  const text = queue[0];
+  if (!text) return;
+  show(text);
+  try {
+    const blob = await askTTS(text);
+    const audio = new Audio(URL.createObjectURL(blob));
+    window.__lastAudio = audio;
+    audio.muted = muted;
+    const src = audioCtx.createMediaElementSource(audio);
+    src.connect(analyser);
+    cur = audio;
+    mouthLoop();
+    await audio.play();
+    audio.onended = () => {
+      cur = null;
+      if (timer) clearInterval(timer);
+      queue.shift();
+      next();
+    };
+  } catch (e) {
+    show("声音没出来：" + e.message);
+    queue.shift();
+  }
+}
+
+async function reply(text) {
+  show("……");
+  try {
+    const r = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text })
+    });
+    const data = await r.json();
+    if (data.reply) await speak(data.reply);
+    else show("（没有回答）");
+  } catch (e) {
+    show("连不上后台：" + e.message);
+  }
+}
+
+/* ---------------- 交互 ---------------- */
+$("#test").onclick = () => { ensureAudio(); speak("主人，我在。要不要试试按住说话？"); };
+$("#send").onclick = () => { const v = $("#say").value.trim(); if (v) { $("#say").value = ""; reply(v); } };
+$("#say").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#send").click(); });
+$("#mute").onclick = () => { muted = !muted; $("#mute").textContent = muted ? "开声音" : "静音"; };
+
+let recog = null, listening = false;
+$("#mic").onclick = () => {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { show("这个浏览器不支持语音识别，用 Chrome/Edge 试试。"); return; }
+  if (listening) { recog.stop(); return; }
+  recog = new SR();
+  recog.lang = "zh-CN";
+  recog.interimResults = false;
+  recog.maxAlternatives = 1;
+  recog.onstart = () => { listening = true; $("#mic").textContent = "在听……（再说一句就停）"; };
+  recog.onresult = (e) => {
+    const text = e.results[0][0].transcript.trim();
+    if (text) reply(text);
+  };
+  recog.onerror = (e) => { show(e.error === "network" ? "浏览器的语音识别要连 Google 服务，这台机器连不上；先用下面的输入框打字吧。" : "没听清：" + e.error); };
+  recog.onend = () => { listening = false; $("#mic").textContent = "按住说话（点一下开始）"; };
+  recog.start();
+};
+
+const es = new EventSource("/events");
+es.onmessage = (e) => {
+  try {
+    const d = JSON.parse(e.data);
+    if (d.reply) speak(d.reply);
+  } catch (err) {}
+};
+
+loadModel().then(() => { mouthLoop(); }).catch((e) => {
+  $("#err").textContent = "Live2D 没加载起来：" + e.message + "（可以打开 /classic.html 用 SVG 版）";
+});
+</script>
+</body>
+</html>
