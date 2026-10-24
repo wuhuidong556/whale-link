@@ -10,7 +10,7 @@
   html,body { height:100%; margin:0; font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
     color:var(--ink); background:radial-gradient(120% 90% at 70% 10%,#eaf6ff,#cfe6f7 55%,#b6d4ea); overflow:hidden; }
   canvas { position:fixed; inset:0; width:100vw !important; height:100vh !important; z-index:0; }
-  #bubble { position:fixed; left:50%; transform:translateX(-50%); top:54px; max-width:min(92vw,560px);
+  #bubble { position:fixed; left:50%; transform:translateX(-50%); top:52px; max-width:min(92vw,560px);
     background:rgba(255,255,255,.95); border-radius:14px; padding:10px 14px; font-size:14px; line-height:1.5;
     box-shadow:0 8px 24px rgba(16,48,80,.18); z-index:3; transition:opacity .3s; }
   #bubble.hide { opacity:0; pointer-events:none; }
@@ -20,7 +20,8 @@
   #tabs button { border:0; background:transparent; color:#33536f; font-size:14px; padding:7px 14px; border-radius:9px; }
   #tabs button.on { background:var(--blue); color:#fff; }
 
-  .pane { position:fixed; inset:0; z-index:2; display:none; flex-direction:column; padding:52px 16px 92px; }
+  .pane { position:fixed; inset:0; z-index:2; display:none; flex-direction:column; padding:104px 16px 100px; }
+  @media (max-width: 560px) { .pane { padding:112px 12px 108px; } }
   #pane-pc, #pane-files, #pane-dsh { background:rgba(233,244,253,.96); }
   #pane-pc h3, #pane-files h3 { margin:8px 0 10px; font-size:15px; color:#2b5f8a; }
   .pane.on { display:flex; }

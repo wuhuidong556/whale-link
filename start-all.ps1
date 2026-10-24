@@ -1,4 +1,4 @@
-﻿# 鲸鱼娘一键启动：DSH(8780) -> whale-link(8770) -> 桌面宠物
+# 鲸鱼娘一键启动：DSH(8780) -> whale-link(8770) -> 桌面宠物
 $ErrorActionPreference = 'SilentlyContinue'
 $root = Split-Path -Parent $PSCommandPath
 $log  = Join-Path $root 'start-all.log'
@@ -25,7 +25,8 @@ if (-not (Test-Port 8780)) {
     $cfgPath = Join-Path $root 'server\config.json'
     $cfg = Get-Content $cfgPath -Raw | ConvertFrom-Json
     $cfg.dsh_token = $tok
-    $cfg | ConvertTo-Json -Depth 8 | Set-Content $cfgPath -Encoding utf8
+    $json = $cfg | ConvertTo-Json -Depth 8
+    [System.IO.File]::WriteAllText($cfgPath, $json, (New-Object System.Text.UTF8Encoding($false)))
     Log "dsh token updated: $($tok.Substring(0,8))..."
   } else { Log 'dsh token not captured' }
 }

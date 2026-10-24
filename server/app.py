@@ -49,7 +49,7 @@ DEFAULT_CFG = {
     "llm": {"base_url": "https://api.deepseek.com/v1", "api_key": "", "model": "deepseek-flash"},
     "wol_mac": "",
 }
-cfg = json.loads(CFG_PATH.read_text(encoding="utf-8")) if CFG_PATH.exists() else dict(DEFAULT_CFG)
+cfg = json.loads(CFG_PATH.read_text(encoding="utf-8-sig")) if CFG_PATH.exists() else dict(DEFAULT_CFG)
 cfg = {**DEFAULT_CFG, **cfg}
 cfg["llm"] = {**DEFAULT_CFG["llm"], **cfg.get("llm", {})}
 if not CFG_PATH.exists():

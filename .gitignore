@@ -23,3 +23,5 @@ _check.js
 pet_run.txt
 server/_patch_*.py
 web/_patch_*.py
+_gh_*.txt
+_repo.json
